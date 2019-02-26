@@ -27,6 +27,7 @@ class FirestoreAnimatedList extends StatefulWidget {
     this.defaultChild,
     this.errorChild,
     this.emptyChild,
+    this.onNotification,
     this.scrollDirection = Axis.vertical,
     this.reverse = false,
     this.debug = false,
@@ -37,7 +38,6 @@ class FirestoreAnimatedList extends StatefulWidget {
     this.padding,
     this.duration = const Duration(milliseconds: 300),
   }) : super(key: key) {
-    assert(query != null);
     assert(itemBuilder != null);
   }
 
@@ -55,6 +55,9 @@ class FirestoreAnimatedList extends StatefulWidget {
   /// A widget to display if the query returns empty. Defaults to a
   /// `Container()`;
   final Widget emptyChild;
+
+  /// callback for a NotificationListener<ScrollNotification>
+  final Function onNotification;
 
   /// Called, as needed, to build list item widgets.
   ///
@@ -241,25 +244,32 @@ class FirestoreAnimatedListState extends State<FirestoreAnimatedList> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loaded && _model.isEmpty) {
+     if (_loaded && _model.isEmpty) {
       return widget.emptyChild ?? Container();
+    }
+
+    if (!_loaded) {
+      return widget.defaultChild ??
+          const Center(child: CircularProgressIndicator());
     }
 
     if (_error != null && _error.isNotEmpty) {
       return widget.errorChild ?? const Center(child: Icon(Icons.error));
     }
 
-    return AnimatedList(
-      key: _animatedListKey,
-      itemBuilder: _buildItem,
-      initialItemCount: _model.length,
-      scrollDirection: widget.scrollDirection,
-      reverse: widget.reverse,
-      controller: widget.controller,
-      primary: widget.primary,
-      physics: widget.physics,
-      shrinkWrap: widget.shrinkWrap,
-      padding: widget.padding,
-    );
+    return NotificationListener<ScrollNotification>(
+        onNotification: widget.onNotification,
+        child: AnimatedList(
+          key: _animatedListKey,
+          itemBuilder: _buildItem,
+          initialItemCount: _model.length,
+          scrollDirection: widget.scrollDirection,
+          reverse: widget.reverse,
+          controller: widget.controller,
+          primary: widget.primary,
+          physics: widget.physics,
+          shrinkWrap: widget.shrinkWrap,
+          padding: widget.padding,
+    ));
   }
 }
