@@ -11,26 +11,35 @@ import 'package:flutter/material.dart';
 
 import 'firestore_list.dart';
 
-typedef Widget FirestoreAnimatedListItemBuilder(
+typedef Widget FirestoreAnimatedStaggeredItemBuilder(
   BuildContext context,
   DocumentSnapshot snapshot,
   Animation<double> animation,
   int index,
 );
 
+typedef StaggeredTile FirestoreStaggeredTileBuilder(
+  int index,
+  DocumentSnapshot snapshot,
+);
+
 /// An AnimatedList widget that is bound to a query
-class FirestoreAnimatedList extends StatefulWidget {
+class FirestoreAnimatedStaggered extends StatefulWidget {
   /// Creates a scrolling container that animates items when they are inserted or removed.
-  FirestoreAnimatedList({
+  FirestoreAnimatedStaggered({
     Key key,
     @required this.query,
     @required this.itemBuilder,
+    @required this.staggeredTileBuilder,
+    @required this.crossAxisCount,
+    this.mainAxisSpacing = 4.0,
+    this.crossAxisSpacing = 4.0,
+    this.childAspectRatio = 1.0,
     this.onLoaded,
     this.filter,
     this.defaultChild,
     this.errorChild,
     this.emptyChild,
-    this.onNotification,
     this.scrollDirection = Axis.vertical,
     this.reverse = false,
     this.debug = false,
@@ -41,18 +50,38 @@ class FirestoreAnimatedList extends StatefulWidget {
     this.shrinkWrap = false,
     this.padding,
     this.duration = const Duration(milliseconds: 300),
-  }) : super(key: key) {
-    assert(itemBuilder != null);
-  }
+  })  : assert(query != null),
+        assert(itemBuilder != null),
+        assert(staggeredTileBuilder != null),
+        assert(crossAxisCount != null && crossAxisCount > 0),
+        assert(mainAxisSpacing != null && mainAxisSpacing >= 0),
+        assert(crossAxisSpacing != null && crossAxisSpacing >= 0),
+        assert(childAspectRatio != null && childAspectRatio > 0),
+        super(key: key);
 
   /// A Firestore query to use to populate the animated list
   final Stream<QuerySnapshot> query;
 
-  /// Method that gets called once the stream updates with a new QuerySnapshot
+  /// Method that gets called once the stream updates with a new [QuerySnapshot]
   final Function(QuerySnapshot) onLoaded;
 
-  /// Called before any operation with a DocumentSnapshot;
-  /// If it returns `true`, then dismisses that DocumentSnapshot from the list
+  /// Signature for a function that creates [StaggeredTile] for a given index and [DocumentSnapshot]
+  final FirestoreStaggeredTileBuilder staggeredTileBuilder;
+
+  /// The number of children in the cross axis.
+  final int crossAxisCount;
+
+  /// The number of logical pixels between each child along the main axis.
+  final double mainAxisSpacing;
+
+  /// The number of logical pixels between each child along the cross axis.
+  final double crossAxisSpacing;
+
+  /// The ratio of the cross-axis to the main-axis extent of each child.
+  final double childAspectRatio;
+
+  /// Called before any operation with a [DocumentSnapshot];
+  /// If it returns `true`, then dismisses that [DocumentSnapshot] from the list
   final FilterCallback filter;
 
   /// This will change `onDocumentAdded` call to `.add` instead of `.insert`,
@@ -71,9 +100,6 @@ class FirestoreAnimatedList extends StatefulWidget {
   /// `Container()`;
   final Widget emptyChild;
 
-  /// callback for a NotificationListener<ScrollNotification>
-  final Function onNotification;
-
   /// Called, as needed, to build list item widgets.
   ///
   /// List items are only built when they're scrolled into view.
@@ -83,7 +109,7 @@ class FirestoreAnimatedList extends StatefulWidget {
   ///
   /// Implementations of this callback should assume that [AnimatedList.removeItem]
   /// removes an item immediately.
-  final FirestoreAnimatedListItemBuilder itemBuilder;
+  final FirestoreAnimatedStaggeredItemBuilder itemBuilder;
 
   /// The axis along which the scroll view scrolls.
   ///
@@ -157,12 +183,14 @@ class FirestoreAnimatedList extends StatefulWidget {
   final Duration duration;
 
   @override
-  FirestoreAnimatedListState createState() => FirestoreAnimatedListState();
+  FirestoreAnimatedStaggeredState createState() =>
+      FirestoreAnimatedStaggeredState();
 }
 
-class FirestoreAnimatedListState extends State<FirestoreAnimatedList> {
-  final GlobalKey<AnimatedListState> _animatedListKey =
-      GlobalKey<AnimatedListState>();
+class FirestoreAnimatedStaggeredState
+    extends State<FirestoreAnimatedStaggered> {
+  final GlobalKey<AnimatedStaggeredGridState> _animatedListKey =
+      GlobalKey<AnimatedStaggeredGridState>();
   FirestoreList _model;
   String _error;
   bool _loaded = false;
@@ -262,32 +290,30 @@ class FirestoreAnimatedListState extends State<FirestoreAnimatedList> {
 
   @override
   Widget build(BuildContext context) {
-     if (_loaded && _model.isEmpty) {
+    if (_loaded && _model.isEmpty) {
       return widget.emptyChild ?? Container();
-    }
-
-    if (!_loaded) {
-      return widget.defaultChild ??
-          const Center(child: CircularProgressIndicator());
     }
 
     if (_error != null && _error.isNotEmpty) {
       return widget.errorChild ?? const Center(child: Icon(Icons.error));
     }
 
-    return NotificationListener<ScrollNotification>(
-        onNotification: widget.onNotification,
-        child: AnimatedList(
-          key: _animatedListKey,
-          itemBuilder: _buildItem,
-          initialItemCount: _model.length,
-          scrollDirection: widget.scrollDirection,
-          reverse: widget.reverse,
-          controller: widget.controller,
-          primary: widget.primary,
-          physics: widget.physics,
-          shrinkWrap: widget.shrinkWrap,
-          padding: widget.padding,
-    ));
+    return AnimatedStaggeredGrid(
+      key: _animatedListKey,
+      staggeredTileBuilder: (index) =>
+          widget.staggeredTileBuilder?.call(index, _model.elementAt(index)),
+      crossAxisCount: widget.crossAxisCount,
+      mainAxisSpacing: widget.mainAxisSpacing,
+      crossAxisSpacing: widget.crossAxisSpacing,
+      itemBuilder: _buildItem,
+      initialItemCount: _model.length,
+      scrollDirection: widget.scrollDirection,
+      reverse: widget.reverse,
+      controller: widget.controller,
+      primary: widget.primary,
+      physics: widget.physics,
+      shrinkWrap: widget.shrinkWrap,
+      padding: widget.padding,
+    );
   }
 }

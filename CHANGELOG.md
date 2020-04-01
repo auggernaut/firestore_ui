@@ -1,3 +1,49 @@
+## [1.9.1] - 2020-03-10
+
+* Downgraded `firebase_core` to 0.4.4
+* Downgraded `cloud_firestore` to 0.13.4
+* Those were causing some [issues](https://github.com/flutter/flutter/issues/35670#issuecomment-592769263) while building, will wait before updating again
+
+## [1.9.0] - 2020-03-09
+
+* Updated `firebase_core` to 0.4.4+2
+* Updated `cloud_firestore` to 0.13.4+1
+* Added `linear` parameter to everything available, this will change `FirestoreList`'s `onDocumentAdded` call to `.add` instead of `.insert`, which might help if your query doesn't care about order changes
+
+## [1.8.0] - 2020-02-17
+
+* Updated `firebase_core` to 0.4.4
+* Updated `cloud_firestore` to 0.13.2+1
+* Replaces deprecated method calls in the tests
+
+## [1.7.2] - 2019-09-05
+
+* Added `FirestoreAnimatedGrid` and `FirestoreAnimatedStaggered`!
+* Updated `firebase_core` to 0.4.0+9
+* Updated `cloud_firestore` to 0.12.9+3
+* Added `flutter_staggered_grid_view` on 0.3.0
+* Updated `StaggeredTileBuilder` to also have an instance of the referenced `DocumentSnapshot`
+* Minor changes to `README.md`!
+
+## [1.6.0] - 2019-06-04
+
+* Updates to the `filter` mechanism, it would hide items due to an index mismanagement
+* Updated cloud_firestore to 0.12.2
+
+## [1.5.0] - 2019-05-09
+
+* Added `filter` parameter that takes out data if it returns true for that `DocumentSnapshot`
+* Updated cloud_firestore to 0.12.0
+
+## [1.4.0] - 2019-05-09
+
+* Changed dependency requirements
+
+## [1.3.0] - 2019-04-30
+
+* Added `onLoaded` method for when you need to interact directly with the `QuerySnapshot` that came from the stream
+* Bump cloud_firestore dependency version to 0.10.0
+
 ## [1.2.0] - 2019-02-08
 
 * Bump cloud_firestore dependency version to 0.9.0

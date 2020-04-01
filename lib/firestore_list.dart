@@ -7,9 +7,10 @@ import 'dart:collection';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firestore_ui/stream_subscriber_mixin.dart';
-import 'package:meta/meta.dart' show required;
+import 'package:meta/meta.dart';
 
 typedef void DocumentCallback(int index, DocumentSnapshot snapshot);
+typedef bool FilterCallback(DocumentSnapshot snapshot);
 typedef void ValueCallback(DocumentSnapshot snapshot);
 typedef void QueryCallback(QuerySnapshot querySnapshot);
 typedef void ErrorCallback(Error error);
@@ -25,6 +26,8 @@ class FirestoreList extends ListBase<DocumentSnapshot>
     this.onLoaded,
     this.onValue,
     this.onError,
+    this.filter,
+    this.linear = false,
     this.debug = false,
   }) {
     assert(query != null);
@@ -34,10 +37,18 @@ class FirestoreList extends ListBase<DocumentSnapshot>
   /// Database query used to populate the list
   final Stream<QuerySnapshot> query;
 
-  // Whether or not to show debug logs
+  /// Whether or not to show debug logs
   final bool debug;
 
+  /// This will change `onDocumentAdded` call to `.add` instead of `.insert`,
+  /// which might help if your query doesn't care about order changes
+  final bool linear;
+
   static const String TAG = "FIRESTORE_LIST";
+
+  /// Called before any operation with a DocumentSnapshot;
+  /// If it returns `true`, then dismisses that DocumentSnapshot from the list
+  final FilterCallback filter;
 
   /// Called when the Document has been added
   final DocumentCallback onDocumentAdded;
@@ -70,7 +81,9 @@ class FirestoreList extends ListBase<DocumentSnapshot>
 
   @override
   DocumentSnapshot operator [](int index) =>
-      _snapshots.isEmpty ? null : _snapshots[index];
+      _snapshots.isEmpty || index < 0 || index >= length
+          ? null
+          : _snapshots[index];
 
   @override
   void operator []=(int index, DocumentSnapshot value) {
@@ -96,18 +109,24 @@ class FirestoreList extends ListBase<DocumentSnapshot>
   void _onChange(List<DocumentChange> documentChanges) {
     if (documentChanges != null && documentChanges.isNotEmpty) {
       for (DocumentChange change in documentChanges) {
-        switch (change.type) {
-          case DocumentChangeType.added:
-            _onDocumentAdded(change);
-            break;
-          case DocumentChangeType.modified:
-            _onDocumentChanged(change);
-            break;
-          case DocumentChangeType.removed:
-            _onDocumentRemoved(change);
-            break;
+        final isHidden = filter?.call(change.document) ?? false;
+        log("Document ${change.document.documentID} is hidden: $isHidden");
+        if (isHidden) {
+          log("Document ${change.document.documentID} filtered out of list");
+        } else {
+          switch (change.type) {
+            case DocumentChangeType.added:
+              _onDocumentAdded(change);
+              break;
+            case DocumentChangeType.modified:
+              _onDocumentChanged(change);
+              break;
+            case DocumentChangeType.removed:
+              _onDocumentRemoved(change);
+              break;
+          }
+          _onValue(change.document);
         }
-        _onValue(change.document);
       }
     } else {
       log("Got null or empty list of DocumentChange, nothing to do.");
@@ -125,8 +144,14 @@ class FirestoreList extends ListBase<DocumentSnapshot>
   void _onDocumentAdded(DocumentChange event) {
     try {
       log("Calling _onDocumentAdded for document on index ${event?.newIndex}");
-      _snapshots.insert(event.newIndex, event.document);
-      onDocumentAdded?.call(event.newIndex, event.document);
+      if (linear ?? false) {
+        _snapshots.add(event.document);
+        onDocumentAdded?.call(_snapshots.length - 1, event.document);
+      } else {
+        final index = event.newIndex >= length ? length : event.newIndex;
+        _snapshots.insert(index, event.document);
+        onDocumentAdded?.call(index, event.document);
+      }
     } catch (error) {
       log("Failed on adding item on index ${event?.newIndex}");
     }
@@ -134,9 +159,14 @@ class FirestoreList extends ListBase<DocumentSnapshot>
 
   void _onDocumentRemoved(DocumentChange event) {
     try {
-      log("Calling _onDocumentRemoved for document on index ${event?.newIndex}");
-      _snapshots.removeAt(event.oldIndex);
-      onDocumentRemoved?.call(event.oldIndex, event.document);
+      log("Calling _onDocumentRemoved for document on index ${event?.oldIndex}");
+      final index = _indexForKey(event.document.documentID);
+      if (index > -1) {
+        _snapshots.removeAt(index);
+        onDocumentRemoved?.call(index, event.document);
+      } else {
+        log("Failed on removing item on index $index");
+      }
     } catch (error) {
       log("Failed on removing item on index ${event?.oldIndex}");
     }

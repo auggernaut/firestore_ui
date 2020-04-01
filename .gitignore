@@ -3,6 +3,12 @@
 
 .packages
 .pub/
+.idea/
+.vscode/
+
+flutter_export_environment.sh
+
+.flutter-plugins-dependencies
 
 build/
 ios/.generated/
